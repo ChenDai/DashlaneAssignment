@@ -1,0 +1,1 @@
+﻿<%@ WebService Language="C#" CodeBehind="IconCrawler.asmx.cs" Class="IconCrawlerWebService.IconCrawler" %>
