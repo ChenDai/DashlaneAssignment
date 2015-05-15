@@ -5,6 +5,7 @@ using System.Linq;
 using System.Net;
 using System.Web;
 using System.Web.Services;
+using System.Xml;
 
 namespace IconCrawlerWebService
 {
@@ -19,7 +20,7 @@ namespace IconCrawlerWebService
     public class IconCrawler : System.Web.Services.WebService
     {
 
-        readonly private List<string> ImagesToTry = new List<string>{ "/favicon.ico", "/apple-touch-icon.png" };
+        readonly private List<string> ImagesToTry = new List<string> { "/favicon.ico", "/apple-touch-icon.png" };
 
         private HttpWebResponse getWebResponse(string domain)
         {
@@ -51,7 +52,7 @@ namespace IconCrawlerWebService
             // step 1 : getwebresponse with original domain name
             domain = domain.ToLower();
             if (!domain.Contains("http://") && !domain.Contains("https://"))
-                domain = "http://" + domain;
+                domain = string.Concat("http://", domain);
 
             HttpWebResponse response = getWebResponse(domain);
 
@@ -59,7 +60,7 @@ namespace IconCrawlerWebService
             if (response == null || response.StatusCode == HttpStatusCode.NotFound)
             {
                 // if contain www. delete it, otherwise add www.
-                if(domain.Contains("www."))
+                if (domain.Contains("www."))
                     domain = domain.Replace("www.", "");
                 else
                     domain = domain.Replace("://", "://www.");
@@ -74,16 +75,36 @@ namespace IconCrawlerWebService
             // try potentially images list
             foreach (string image in ImagesToTry)
             {
-                response = getWebResponse(domain + image);
-                if(response != null && response.StatusCode == HttpStatusCode.OK)
-                    using (StreamReader reader = new StreamReader(response.GetResponseStream()))
-                    {
-                        return reader.ReadToEnd();
-                    }
+                HttpWebResponse imageResponse = getWebResponse(string.Concat(domain, image));
+                if (imageResponse != null && imageResponse.StatusCode == HttpStatusCode.OK)
+                    return string.Concat(domain, image);
             }
 
             // try to find link tag in html page
-            return string.Empty;
+            using (StreamReader reader = new StreamReader(response.GetResponseStream()))
+            {
+                string pageContent = reader.ReadToEnd();
+                HtmlAgilityPack.HtmlDocument htmlPageContent = new HtmlAgilityPack.HtmlDocument();
+                htmlPageContent.LoadHtml(pageContent);
+                HtmlAgilityPack.HtmlNode pageNode = htmlPageContent.DocumentNode;
+
+                foreach (HtmlAgilityPack.HtmlNode link in pageNode.SelectNodes("/html/head/link[contains(@rel,'icon') and @href]"))
+                {
+                    // if the rel attribut of any link contains icon, try to fetch the href
+                    if (link.Attributes["rel"]!= null && link.Attributes["rel"].Value.Contains("icon"))
+                    {
+                        string hrefInLink = link.Attributes["href"] == null ? string.Empty : link.Attributes["href"].Value;
+                        if (!string.IsNullOrEmpty(hrefInLink))
+                        {
+                            HttpWebResponse imageResponse = getWebResponse(hrefInLink);
+                            if (imageResponse != null && imageResponse.StatusCode == HttpStatusCode.OK)
+                                return hrefInLink;
+                        }
+                    }
+                }
+                return string.Empty;
+            }
+
         }
     }
 }
