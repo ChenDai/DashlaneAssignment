@@ -224,6 +224,30 @@ namespace IconCrawlerWebService
                                     updateCache(domain, new ImageInfo(hrefInLink, DateTime.Now));
                                     return hrefInLink;
                                 }
+                                else
+                                {
+                                    // try to fetch relative path
+                                    string absoluteUri = domain;
+
+                                    try
+                                    {
+                                        if (hrefInLink.StartsWith("~"))
+                                        {
+                                            hrefInLink = hrefInLink.Substring(1);
+                                        }
+                                        absoluteUri = new Uri(new Uri(domain), hrefInLink).ToString();
+                                    }
+                                    catch {
+                                        absoluteUri = string.Empty;
+                                    }
+
+                                    imageResponse = getWebResponse(absoluteUri);
+                                    if (imageResponse != null && imageResponse.StatusCode == HttpStatusCode.OK)
+                                    {
+                                        updateCache(domain, new ImageInfo(absoluteUri, DateTime.Now));
+                                        return absoluteUri;
+                                    }
+                                }
                             }
                         }
                     }
